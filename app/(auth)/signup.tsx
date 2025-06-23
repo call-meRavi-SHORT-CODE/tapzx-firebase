@@ -18,6 +18,7 @@ import {
   View,
   SafeAreaView,
 } from "react-native"
+import { useAuth } from "../../contexts/AuthContext"
 
 const { width, height } = Dimensions.get("window")
 
@@ -55,6 +56,8 @@ export default function SignUpScreen() {
   const [fadeAnim] = useState(new Animated.Value(0))
   const [slideAnim] = useState(new Animated.Value(50))
   const [progressAnim] = useState(new Animated.Value(0))
+
+  const { signUp } = useAuth()
 
   useEffect(() => {
     Animated.parallel([
@@ -148,13 +151,15 @@ export default function SignUpScreen() {
     setIsLoading(true)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      console.log("User registration data:", formData)
-      router.push("./AddLinks")
-    } catch (error) {
-      Alert.alert("Registration Failed", "Something went wrong. Please try again.", [{ text: "OK" }])
+      await signUp({
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phoneNumber: formData.phoneNumber.trim(),
+        password: formData.password
+      })
+      // Navigation will be handled by the auth state change in index.tsx
+    } catch (error: any) {
+      Alert.alert("Registration Failed", error.message)
     } finally {
       setIsLoading(false)
     }

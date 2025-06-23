@@ -20,6 +20,7 @@ import {
   SafeAreaView,
 } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
+import { useAuth } from "../../contexts/AuthContext"
 
 const { width, height } = Dimensions.get("window")
 
@@ -31,9 +32,20 @@ const ProfileEditScreen: React.FC = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  const { updateUserProfile, uploadProfileImage, userProfile } = useAuth()
+
   useEffect(() => {
     requestPermissions()
-  }, [])
+    
+    // Pre-fill form if user profile exists
+    if (userProfile) {
+      setUsername(userProfile.username || "")
+      setOrganizationName(userProfile.organizationName || "")
+      setBio(userProfile.bio || "")
+      setLocation(userProfile.location || "")
+      setProfileImage(userProfile.profileImage || null)
+    }
+  }, [userProfile])
 
   const requestPermissions = async () => {
     if (Platform.OS !== "web") {
@@ -65,21 +77,27 @@ const ProfileEditScreen: React.FC = () => {
     try {
       setIsLoading(true)
 
+      let profileImageUrl = profileImage
+      
+      // Upload profile image if it's a local URI
+      if (profileImage && profileImage.startsWith('file://')) {
+        profileImageUrl = await uploadProfileImage(profileImage)
+      }
+
       const profileData = {
         username: username.trim().toLowerCase(),
         organizationName: organizationName.trim(),
         bio: bio.trim(),
         location: location.trim(),
-        profileImage,
+        profileImage: profileImageUrl ?? undefined, // <-- FIXED HERE
         profileUrl: `app.me/${username.trim().toLowerCase()}`,
       }
 
-      console.log("Saving profile data:", profileData)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      router.push("./AddLinks")
-    } catch (error) {
-      Alert.alert("Error", "Failed to save profile. Please try again.")
+      await updateUserProfile(profileData)
+      router.push("./(auth)/addlinks")
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to save profile. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -193,7 +211,7 @@ const ProfileEditScreen: React.FC = () => {
 
             {/* Progress Indicator */}
             <View style={styles.progressContainer}>
-              <Text style={styles.progressText}>Step 1 of 3</Text>
+              <Text style={styles.progressText}>Step 2 of 3</Text>
               <View style={styles.progressBar}>
                 <View style={styles.progressFill} />
               </View>
@@ -215,6 +233,7 @@ const ProfileEditScreen: React.FC = () => {
                     autoCorrect={false}
                     maxLength={30}
                     placeholderTextColor="#64748B"
+                    editable={!isLoading}
                   />
                 </View>
                 {username.length > 0 && (
@@ -231,6 +250,7 @@ const ProfileEditScreen: React.FC = () => {
                   onChangeText={setOrganizationName}
                   maxLength={50}
                   placeholderTextColor="#64748B"
+                  editable={!isLoading}
                 />
               </View>
 
@@ -246,6 +266,7 @@ const ProfileEditScreen: React.FC = () => {
                   textAlignVertical="top"
                   maxLength={150}
                   placeholderTextColor="#64748B"
+                  editable={!isLoading}
                 />
                 <Text style={styles.characterCount}>{bio.length}/150</Text>
               </View>
@@ -259,6 +280,7 @@ const ProfileEditScreen: React.FC = () => {
                   onChangeText={setLocation}
                   maxLength={50}
                   placeholderTextColor="#64748B"
+                  editable={!isLoading}
                 />
               </View>
             </View>
@@ -388,7 +410,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressFill: {
-    width: "33.33%",
+    width: "66.66%",
     height: "100%",
     backgroundColor: "#F59E0B",
     borderRadius: 2,

@@ -18,7 +18,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
-import PlatformModal from "./PlatformModal"
+import PlatformModal from "../../components/PlatformModal"
+import { useAuth } from "../../contexts/AuthContext"
 
 const { width, height } = Dimensions.get("window")
 
@@ -148,6 +149,8 @@ export default function AddLinksScreen() {
   const [slideAnim] = useState(new Animated.Value(50))
   const [progressAnim] = useState(new Animated.Value(0))
 
+  const { updateUserProfile, userProfile } = useAuth()
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -166,7 +169,12 @@ export default function AddLinksScreen() {
         useNativeDriver: false,
       }),
     ]).start()
-  }, [])
+
+    // Pre-fill existing platforms
+    if (userProfile?.platforms) {
+      setSelectedPlatforms(userProfile.platforms)
+    }
+  }, [userProfile])
 
   const handleGoBack = () => {
     router.back()
@@ -174,7 +182,7 @@ export default function AddLinksScreen() {
 
   const navigateToNextStep = useCallback(() => {
     try {
-      router.push("./ProfilePage")
+      router.replace("./(tabs)/home")
     } catch (error) {
       console.log("Navigation error:", error)
       Alert.alert("Navigation Error", "Unable to proceed to the next step.", [{ text: "OK" }])
@@ -193,17 +201,16 @@ export default function AddLinksScreen() {
   }
 
   const handleContinue = async () => {
-    if (selectedPlatforms.length === 0) return
-
     setIsLoading(true)
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      console.log("Selected platforms:", selectedPlatforms)
+      await updateUserProfile({
+        platforms: selectedPlatforms
+      })
       navigateToNextStep()
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving platforms:", error)
-      Alert.alert("Error", "Failed to save your preferences. Please try again.", [{ text: "OK" }])
+      Alert.alert("Error", error.message || "Failed to save your preferences. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -276,7 +283,7 @@ export default function AddLinksScreen() {
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 3],
-    outputRange: ["0%", "66.66%"],
+    outputRange: ["0%", "100%"],
   })
 
   const renderPlatformItem = ({ item }: { item: Platform }) => {
@@ -361,7 +368,7 @@ export default function AddLinksScreen() {
           {/* Progress Indicator */}
           <View style={styles.progressContainer}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressText}>Step 2 of 3</Text>
+              <Text style={styles.progressText}>Step 3 of 3</Text>
               <Text style={styles.selectedCount}>
                 {selectedPlatforms.length} platform{selectedPlatforms.length !== 1 ? "s" : ""} added
               </Text>
@@ -412,13 +419,13 @@ export default function AddLinksScreen() {
           {/* Continue Button */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
-              style={[styles.continueButton, selectedPlatforms.length === 0 && styles.continueButtonDisabled]}
+              style={[styles.continueButton]}
               onPress={handleContinue}
-              disabled={selectedPlatforms.length === 0 || isLoading}
+              disabled={isLoading}
               activeOpacity={0.9}
             >
               <LinearGradient
-                colors={selectedPlatforms.length > 0 && !isLoading ? ["#F59E0B", "#FBBF24"] : ["#64748B", "#64748B"]}
+                colors={!isLoading ? ["#F59E0B", "#FBBF24"] : ["#64748B", "#64748B"]}
                 style={styles.continueGradient}
               >
                 {isLoading ? (
@@ -427,15 +434,14 @@ export default function AddLinksScreen() {
                   </View>
                 ) : (
                   <Text style={styles.continueButtonText}>
-                    Continue with {selectedPlatforms.length} platform{selectedPlatforms.length !== 1 ? "s" : ""}
+                    {selectedPlatforms.length > 0 
+                      ? `Continue with ${selectedPlatforms.length} platform${selectedPlatforms.length !== 1 ? "s" : ""}`
+                      : "Continue"
+                    }
                   </Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
-
-            {selectedPlatforms.length === 0 && (
-              <Text style={styles.helperText}>Add at least one platform to continue</Text>
-            )}
           </View>
         </Animated.View>
 
@@ -668,10 +674,6 @@ const styles = StyleSheet.create({
     elevation: 8,
     marginBottom: 12,
   },
-  continueButtonDisabled: {
-    shadowOpacity: 0,
-    elevation: 0,
-  },
   continueGradient: {
     paddingVertical: 14,
     borderRadius: 12,
@@ -688,10 +690,5 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  helperText: {
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
   },
 })
